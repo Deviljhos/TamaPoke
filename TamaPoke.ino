@@ -882,6 +882,9 @@ int gFontAscent = 0;  // px del borde superior a la linea base, 0 = fuente clasi
 // superconjunto estricto, comprobado glifo a glifo sobre los 226 codepoints
 // que usa el firmware. Cuesta 102 KB mas de flash y no mueve un pixel.
 #define CJK_FONT u8g2_font_unifont_t_japanese3
+// Arabe: misma familia unifont (mismas metricas, mismo CJK_SIZE_DIV), con las
+// formas de presentacion U+FE70..FEFF que genera tools/gen_ar.py. ~9 KB.
+#define AR_FONT u8g2_font_unifont_t_arabic
 #define CJK_SIZE_DIV 2
 
 void setSize(uint8_t n) {
@@ -910,8 +913,8 @@ void applyLangFont() {
     gFontAscent = 0;
     return;
   }
-  gfx->setFont(CJK_FONT);
-  gfx->setUTF8Print(true);     // las cadenas japonesas son UTF-8 multibyte
+  gfx->setFont(gLang == LANG_AR ? AR_FONT : CJK_FONT);
+  gfx->setUTF8Print(true);     // cadenas japonesas/arabes: UTF-8 multibyte
   int16_t x1, y1;
   uint16_t w, h;
   uint8_t antes = gTextSize;
@@ -1020,7 +1023,7 @@ void render() {
       setCur(centerX(rar, 2), 316);
       printT(rar);
     }
-    char reg[24];
+    char reg[48];
     snprintf(reg, sizeof(reg), T(S_POKEDEX_FMT), pet.registeredCount());
     gfx->fillRect(0, 312, 466, 154, gNight ? UI_BG_NIGHT : UI_BG_DAY);
     gfx->setTextColor(inkColor());
@@ -1029,7 +1032,7 @@ void render() {
     printT(reg);
   } else {
     const DexEntry &d = DEX_TBL[pet.speciesId];
-    char name[28];
+    char name[48];
     const char *base = pet.nick[0] ? pet.nick : dexName(pet.speciesId);
     snprintf(name, sizeof(name), T(S_NAME_FMT), pet.shiny ? "*" : "", base, pet.level());
     drawHeader(name, gNight ? UI_INK_NIGHT : d.accent, statusMsg());
@@ -1075,7 +1078,7 @@ void render() {
     } else {
       gfx->fillRoundRect(94, 168, 278, 152, 16, UI_WHITE);
       gfx->drawRoundRect(94, 168, 278, 152, 16, UI_INK);
-      char q[28];
+      char q[64];
       snprintf(q, sizeof(q), T(S_RELEASE_FMT), dexName(pet.speciesId));
       gfx->setTextColor(UI_INK);
       setSize(2);
@@ -1222,13 +1225,13 @@ void renderSack() {
   // pantalla de resultado
   if (sackOverUntil) {
     if (!timeLeft(sackOverUntil)) { sackOpen = false; return; }
-    char b[20];
+    char b[40];
     snprintf(b, sizeof(b), T(S_HITS_FMT), sackHits);
     gfx->setTextColor(ink);
     setSize(4);
     setCur(centerX(b, 4), 150);
     printT(b);
-    char g[18];
+    char g[40];
     snprintf(g, sizeof(g), T(S_STR_GAIN_FMT), sackGain);
     gfx->setTextColor(UI_BAR_BAD);
     setSize(3);
@@ -1240,7 +1243,7 @@ void renderSack() {
       setCur(centerX(T(S_NEW_RECORD), 2), 256);
       printT(T(S_NEW_RECORD));
     } else {
-      char r[18];
+      char r[40];
       snprintf(r, sizeof(r), T(S_RECORD_FMT), pet.strHi);
       gfx->setTextColor(ink);
       setCur(centerX(r, 2), 256);
@@ -1325,7 +1328,7 @@ void renderGame() {
       gameOpen = false;
       return;
     }
-    char buf[22];
+    char buf[40];
     snprintf(buf, sizeof(buf), T(S_SCORE_FMT), gameScore);
     gfx->setTextColor(ink);
     setSize(4);
@@ -1337,7 +1340,7 @@ void renderGame() {
       setCur(centerX(T(S_NEW_RECORD), 2), 214);
       printT(T(S_NEW_RECORD));
     } else {
-      char rec[20];
+      char rec[40];
       snprintf(rec, sizeof(rec), T(S_RECORD_FMT), pet.gameHi);
       gfx->setTextColor(ink);
       setCur(centerX(rec, 2), 214);
@@ -1361,7 +1364,7 @@ void renderGame() {
   setSize(4);
   setCur(centerX(buf, 4), 30);
   printT(buf);
-  char rec[12];
+  char rec[40];
   snprintf(rec, sizeof(rec), T(S_REC_FMT), pet.gameHi);
   setSize(2);
   setCur(centerX(rec, 2), 76);
@@ -1473,7 +1476,7 @@ void drawClockBtn(int x, int y, const char *l) {
 #define LANG_PILL_H 30
 #define LANG_PILL_X 336          // pildora de idioma (cicla los 6 al tocar)
 #define LANG_PILL_W 96
-static const char *const LANG_CODES[LANG_COUNT] = { "ES", "EN", "FR", "DE", "IT", "PT", "JA" };
+static const char *const LANG_CODES[LANG_COUNT] = { "ES", "EN", "FR", "DE", "IT", "PT", "JA", "AR" };
 
 void renderClock() {
   gfx->fillScreen(RGB565_BLACK);
@@ -1581,7 +1584,7 @@ void drawStreakBadge() {
 // banner temporal: medalla nueva o hito de racha
 void drawCelebration() {
   const char *l1 = nullptr, *l2 = nullptr;
-  char buf[20];
+  char buf[64];
   if (pet.showMedal()) {
     for (int i = 0; i < MED_COUNT; i++)
       if (pet.newMedal & (1 << i)) { l2 = medalName(i); break; }
@@ -1626,15 +1629,15 @@ void renderCardProfile() {
   int hlen = strlen(head);
   int hts = (hlen <= 11) ? 3 : 2;
   setSize(hts);
-  setCur(CX - hlen * (hts == 3 ? 9 : 6), hts == 3 ? 34 : 40);
+  setCur(centerX(head, hts), hts == 3 ? 34 : 40);
   printT(head);
   if (pet.nick[0]) {  // especie real bajo el apodo
     const char *sp = dexName(pet.speciesId);
     gfx->setTextColor(UI_TRACK);
     setSize(2);
-    setCur(CX - (strlen(sp) + 2) * 6, 64);
     char par[32];
     snprintf(par, sizeof(par), "(%s)", sp);
+    setCur(centerX(par, 2), 64);
     printT(par);
   }
 
@@ -1645,7 +1648,7 @@ void renderCardProfile() {
   int sx = 138, sy = 224;
   gfx->fillTriangle(sx + 8, sy, sx + 1, sy + 18, sx + 15, sy + 18, UI_BAR_BAD);
   gfx->fillTriangle(sx + 8, sy + 7, sx + 4, sy + 18, sx + 12, sy + 18, UI_BAR_WARN);
-  char rl[30];
+  char rl[64];
   snprintf(rl, sizeof(rl), T(S_STREAK_FMT), pet.streak, pet.bestStreak);
   gfx->setTextColor(UI_INK);
   setSize(2);
@@ -1658,7 +1661,7 @@ void renderCardProfile() {
                       : pet.lovesBerry(0) ? T(S_BERRY_RED)
                       : pet.lovesBerry(1) ? T(S_BERRY_BLUE)
                                           : T(S_BERRY_GREEN);
-  char info[40];
+  char info[96];
   snprintf(info, sizeof(info), T(S_INFO_FMT), berry,
            (unsigned long)(pet.ageMinutes / 1440));
   gfx->setTextColor(UI_INK);
@@ -1696,7 +1699,7 @@ void renderCardMedals() {
   int got = 0;
   for (int i = 0; i < MED_COUNT; i++)
     if (pet.hasMedal(1 << i)) got++;
-  char head[20];
+  char head[48];
   snprintf(head, sizeof(head), T(S_MEDALS_FMT), got, MED_COUNT);
   gfx->setTextColor(UI_INK);
   setSize(3);
@@ -1731,7 +1734,7 @@ void renderCardProgress() {
   printT(T(S_PROGRESS));
 
   // nivel grande
-  char lv[10];
+  char lv[40];
   snprintf(lv, sizeof(lv), T(S_LVL_FMT), pet.level());
   setSize(5);
   setCur(centerX(lv, 5), 86);
@@ -1743,7 +1746,7 @@ void renderCardProgress() {
   gfx->fillRoundRect(bx, by, bw, bh, 6, UI_TRACK);
   int fw = (bw - 4) * into / MINUTES_PER_LEVEL;
   if (fw > 0) gfx->fillRoundRect(bx + 2, by + 2, fw, bh - 4, 5, UI_BAR_OK);
-  char nx[26];
+  char nx[80];
   snprintf(nx, sizeof(nx), T(S_NEXT_LVL_FMT), MINUTES_PER_LEVEL - into, pet.level() + 1);
   gfx->setTextColor(UI_INK);
   setSize(2);
@@ -1754,7 +1757,7 @@ void renderCardProgress() {
   gfx->setTextColor(UI_TRACK);
   setCur(centerX(T(S_EVO_LABEL), 2), 230);
   printT(T(S_EVO_LABEL));
-  char evoBuf[28];
+  char evoBuf[64];
   const char *evo;
   uint16_t evoCol = UI_INK;
   if (d.evolvesTo == 0) {
@@ -1774,7 +1777,7 @@ void renderCardProgress() {
   printT(evo);
 
   // descuidos (retrasan la evolucion)
-  char ms[24];
+  char ms[48];
   snprintf(ms, sizeof(ms), T(S_MISTAKES_FMT), pet.careMistakes);
   gfx->setTextColor(pet.careMistakes > 0 ? UI_BAR_BAD : UI_INK);
   setCur(centerX(ms, 2), 312);
@@ -1906,7 +1909,7 @@ void renderGallery() {
     int glen = strlen(head);
     int gts = (glen <= 13) ? 3 : 2;  // auto-encoge nombres largos (no caben a t3)
     setSize(gts);
-    setCur(CX - glen * (gts == 3 ? 9 : 6), gts == 3 ? 56 : 60);
+    setCur(centerX(head, gts), gts == 3 ? 56 : 60);
     printT(head);
     if (galleryPmd.loaded) {
       // animado y a color si esta registrado; silueta estatica si no (estilo "?")
@@ -2133,7 +2136,7 @@ void drawFarewellButton() {
   int x = FAR_BTN_X - p, y = FAR_BTN_Y - p, w = FAR_BTN_W + 2 * p, h = FAR_BTN_H + 2 * p;
   gfx->fillRoundRect(x, y, w, h, 16, UI_BAR_WARN);
   gfx->drawRoundRect(x, y, w, h, 16, UI_INK);
-  char buf[52];
+  char buf[96];
   const char *nm = pet.nick[0] ? pet.nick : dexName(pet.speciesId);
   snprintf(buf, sizeof(buf), T(S_FAREWELL_BTN), nm);
   gfx->setTextColor(UI_INK);
@@ -2150,7 +2153,7 @@ void drawRunawayButton() {
   int x = FAR_BTN_X - p, y = FAR_BTN_Y - p, w = FAR_BTN_W + 2 * p, h = FAR_BTN_H + 2 * p;
   gfx->fillRoundRect(x, y, w, h, 16, C565(0x3a, 0x44, 0x5a));
   gfx->drawRoundRect(x, y, w, h, 16, C565(0x70, 0x80, 0x98));
-  char buf[52];
+  char buf[96];
   const char *nm = pet.nick[0] ? pet.nick : dexName(pet.speciesId);
   snprintf(buf, sizeof(buf), T(S_RUNAWAY_BTN), nm);
   gfx->setTextColor(C565(0xc8, 0xd2, 0xe0));
